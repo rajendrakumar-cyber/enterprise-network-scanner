@@ -1,10 +1,14 @@
 import asyncio
 from core.discovery import arp_scan
 from core.portscan import scan_ports
+from core.service import grab_banner
+from core.risk import calculate_risk
 from storage.json_db import save_scan
+from storage.history import load_last_scan, compare_scans
 
 TARGET = "192.168.1.0/24"
 PORTS = [22, 80, 443, 445, 3389]
+
 
 async def main():
     print("[*] Discovering devices...")
@@ -18,10 +22,19 @@ async def main():
 
         open_ports = await scan_ports(ip, PORTS)
 
+        services = {}
+        for port in open_ports:
+            banner = grab_banner(ip, port)
+            services[port] = banner
+
+        risk = calculate_risk(open_ports, services)
+
         results.append({
             "ip": ip,
             "mac": device["mac"],
-            "ports": open_ports
+            "ports": open_ports,
+            "services": services,
+            "risk_score": risk
         })
 
     scan_data = {
@@ -29,6 +42,16 @@ async def main():
         "hosts": results
     }
 
+    # 🔥 CHANGE DETECTION
+    old_scan = load_last_scan()
+    changes = compare_scans(old_scan, scan_data)
+
+    print("\n=== CHANGES DETECTED ===")
+    for c in changes:
+        print(c)
+
     save_scan(scan_data)
 
-asyncio.run(main())
+
+if __name__ == "__main__":
+    asyncio.run(main())
