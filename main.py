@@ -5,6 +5,8 @@ from core.service import grab_banner
 from core.risk import calculate_risk
 from storage.json_db import save_scan
 from storage.history import load_last_scan, compare_scans
+from core.attack_path import predict_attack
+from core.exploit_suggest import suggest_exploits
 
 TARGET = "192.168.1.0/24"
 PORTS = [22, 80, 443, 445, 3389]
@@ -22,6 +24,7 @@ async def main():
 
         open_ports = await scan_ports(ip, PORTS)
 
+        # ✅ FIXED INDENTATION
         services = {}
         for port in open_ports:
             banner = grab_banner(ip, port)
@@ -29,12 +32,17 @@ async def main():
 
         risk = calculate_risk(open_ports, services)
 
+        attack_paths = predict_attack(open_ports, services)
+        exploits = suggest_exploits(services)
+
         results.append({
             "ip": ip,
             "mac": device["mac"],
             "ports": open_ports,
             "services": services,
-            "risk_score": risk
+            "risk_score": risk,
+            "attack_paths": attack_paths,
+            "exploits": exploits
         })
 
     scan_data = {
