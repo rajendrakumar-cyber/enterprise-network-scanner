@@ -1,5 +1,8 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Depends
+from fastapi.responses import HTMLResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 import asyncio
+import json
 
 from core.discovery import arp_scan
 from core.portscan import scan_ports
@@ -9,7 +12,23 @@ from core.attack_path import predict_attack
 from core.exploit_suggest import suggest_exploits
 from core.security_analysis import analyze_web_security, analyze_server_security, detect_cloud
 
+from database.db import init_db, save_to_db, get_scans
+from core.recon import dns_lookup, subdomain_enum
+
 app = FastAPI()
+
+# 🔐 AUTH
+security = HTTPBasic()
+USERNAME = "admin"
+PASSWORD = "1234"
+
+def authenticate(credentials: HTTPBasicCredentials = Depends(security)):
+    if credentials.username != USERNAME or credentials.password != PASSWORD:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+
+# 🔥 INIT DB
+init_db()
 
 TARGET = "192.168.1.0/24"
 PORTS = [22, 80, 443, 445, 3389]
@@ -20,10 +39,15 @@ def home():
     return {"message": "Enterprise Scanner API Running"}
 
 
-@app.get("/scan")
-async def run_scan():
-    devices = arp_scan(TARGET)
+@app.get("/ui", response_class=HTMLResponse)
+def ui():
+    with open("api/ui.html") as f:
+        return f.read()
 
+
+@app.get("/scan")
+async def run_scan(user: str = Depends(authenticate)):
+    devices = arp_scan(TARGET)
     results = []
 
     for device in devices:
@@ -51,8 +75,8 @@ async def run_scan():
         results.append({
             "ip": ip,
             "ports": open_ports,
-            "risk": risk,
             "services": services,
+            "risk": risk,
             "attack_paths": attack_paths,
             "exploits": exploits,
             "web_security": web_security,
@@ -60,4 +84,20 @@ async def run_scan():
             "cloud": cloud_info
         })
 
+    # 🔥 SAVE TO DB
+    save_to_db(TARGET, json.dumps(results))
+
     return {"results": results}
+
+
+@app.get("/history")
+def history():
+    return {"data": get_scans()}
+
+
+@app.get("/recon/{domain}")
+def recon(domain: str):
+    return {
+        "ip": dns_lookup(domain),
+        "subdomains": subdomain_enum(domain)
+    }

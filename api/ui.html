@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Enterprise Scanner</title>
+</head>
+<body style="background:black; color:lime; font-family:monospace; padding:20px;">
+
+<h1>🚀 Enterprise Scanner</h1>
+
+<button onclick="runScan()">Run Scan</button>
+
+<pre id="output"></pre>
+
+<script>
+async function runScan() {
+    document.getElementById("output").innerText = "Scanning...";
+
+    const response = await fetch("/scan", {
+        headers: {
+            "Authorization": "Basic " + btoa("admin:1234")
+        }
+    });
+
+    const data = await response.json();
+    document.getElementById("output").innerText = JSON.stringify(data, null, 2);
+}
+</script>
+
+</body>
+</html>
