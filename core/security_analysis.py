@@ -1,18 +1,20 @@
 import socket
+import asyncio
 
-def analyze_web_security(ip, port):
+async def analyze_web_security(ip, port):
     result = {
         "headers": {},
         "issues": []
     }
 
     try:
-        s = socket.socket()
-        s.settimeout(3)
-        s.connect((ip, port))
-
-        s.send(b"GET / HTTP/1.1\r\nHost: test\r\n\r\n")
-        response = s.recv(4096).decode(errors="ignore")
+        reader, writer = await asyncio.open_connection(ip, port)
+        writer.write(b"GET / HTTP/1.1\r\nHost: test\r\n\r\n")
+        await writer.drain()
+        response = await reader.read(4096)
+        writer.close()
+        await writer.wait_closed()
+        response = response.decode(errors="ignore")
 
         headers = response.split("\r\n")
 

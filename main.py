@@ -1,5 +1,5 @@
 import asyncio
-from core.discovery import arp_scan
+from core.discovery import arp_scan, ping_sweep
 from core.portscan import scan_ports
 from core.service import grab_banner
 from core.risk import calculate_risk
@@ -15,6 +15,12 @@ PORTS = [22, 80, 443, 445, 3389]
 async def main():
     print("[*] Discovering devices...")
     devices = arp_scan(TARGET)
+    
+    if not devices:
+        print("[*] ARP scan found no devices, trying ping sweep...")
+        devices = ping_sweep(TARGET)
+    
+    print(f"[+] Found {len(devices)} devices")
 
     results = []
 
@@ -27,7 +33,7 @@ async def main():
         # ✅ FIXED INDENTATION
         services = {}
         for port in open_ports:
-            banner = grab_banner(ip, port)
+            banner = await grab_banner(ip, port)
             services[port] = banner
 
         risk = calculate_risk(open_ports, services)

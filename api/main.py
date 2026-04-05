@@ -4,7 +4,7 @@ from fastapi.security import HTTPBasic, HTTPBasicCredentials
 import asyncio
 import json
 
-from core.discovery import arp_scan
+from core.discovery import arp_scan, ping_sweep
 from core.portscan import scan_ports
 from core.service import grab_banner
 from core.risk import calculate_risk
@@ -48,6 +48,12 @@ def ui():
 @app.get("/scan")
 async def run_scan(user: str = Depends(authenticate)):
     devices = arp_scan(TARGET)
+    
+    if not devices:
+        print("[*] ARP scan found no devices, trying ping sweep...")
+        devices = ping_sweep(TARGET)
+    
+    print(f"[+] Found {len(devices)} devices")
     results = []
 
     for device in devices:
@@ -57,7 +63,7 @@ async def run_scan(user: str = Depends(authenticate)):
 
         services = {}
         for port in open_ports:
-            banner = grab_banner(ip, port)
+            banner = await grab_banner(ip, port)
             services[port] = banner
 
         risk = calculate_risk(open_ports, services)
@@ -67,7 +73,7 @@ async def run_scan(user: str = Depends(authenticate)):
         web_security = {}
         for port in open_ports:
             if port in [80, 443]:
-                web_security[port] = analyze_web_security(ip, port)
+                web_security[port] = await analyze_web_security(ip, port)
 
         server_issues = analyze_server_security(open_ports)
         cloud_info = detect_cloud(services)
